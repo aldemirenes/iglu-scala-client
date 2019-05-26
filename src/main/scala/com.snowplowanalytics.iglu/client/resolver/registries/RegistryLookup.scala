@@ -157,7 +157,7 @@ object RegistryLookup {
 
   private def toSubpath(prefix: String, vendor: String, name: String, model: Option[Int]): String =
     model match {
-      case None    => s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/"
+      case None    => s"${prefix.stripSuffix("/")}/schemas/$vendor/$name"
       case Some(m) => s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$m"
     }
 
@@ -222,7 +222,7 @@ object RegistryLookup {
     name: String,
     model: Option[Int]): F[Either[RegistryError, SchemaList]] = {
     Utils
-      .stringToUri(toSubpath(http.uri.toString, vendor, name, model))
+      .stringToUri(toSubpath(http.uri.toString, vendor, name, None))
       .traverse(uri => Utils.getFromUri(uri, http.apikey))
       .map { response =>
         for {
@@ -230,7 +230,8 @@ object RegistryLookup {
           text <- body.toRight(RegistryError.NotFound)
           json <- parse(text).leftMap(e => RegistryError.RepoFailure(e.show))
           list <- json.as[SchemaList].leftMap(e => RegistryError.RepoFailure(e.show))
-        } yield list
+          withModel = SchemaList(list.schemas.filter(s => model.contains(s.version.model)))
+        } yield withModel
       }
   }
 }
